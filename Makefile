@@ -1,4 +1,4 @@
-CC=gcc
+CC=g++
 
 default:
 	$(CC) -Wall -Wextra -g -o p1_server -I. server.cpp
