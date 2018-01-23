@@ -24,10 +24,35 @@ using namespace std;
 #define PORT 5000
 #define BACKLOG 10
 
+string HTML = "Content-Type: text/html\r\n"; 
+string JPEG = "Content-Type: image/jpeg\r\n"; 
+string JPG = "Content-Type: image/jpeg\r\n"; 
+
+/**
+ * This method throws the perror and exits the program
+ * @param s A string that is the error message
+ **/
 void throwError(string s){
   perror(s.c_str());
   exit(1);
 }
+
+/**
+ * This method parses the HTML request for a file. We MUST be able to handle files with spaces.
+ * @param buffer A character array 
+ * @return string A string representing the file that was found, or an empty string if no file was found. 
+ **/
+string parseFileName(char* buffer){
+  return "a"; // placeholder
+}
+
+/**
+ * This method will write the return response back to the browser (and show the ERROR code or the 
+ * correct file/image that needs to be shown).
+ * Look into chapter 2 for writing proper HTTP responses (apparently people get points off here!)
+ * @param ?? What might we need?
+ **/
+void writeResponse();
 
 int main(){
   int sockfd, new_fd;
@@ -54,22 +79,25 @@ int main(){
   }
 
   sin_size = sizeof(struct sockaddr_in);
-  // cout << "trying to get a connection" << endl;
-  if ((new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size)) < 0){
-    throwError("accept");
+
+  while (1){
+    if ((new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size)) < 0){
+      throwError("accept");
+    }
+
+    // fork here? How do we keep this running for a long time while keeping the server open for multiple requests from the browser?
+
+    int n;
+    char buffer[8192];    // 8192 is usually the largest size that we may have to handle/ 
+
+    memset(buffer, 0, 8192);
+
+    n = read(new_fd, buffer, 8191);   // Is there any way to handle reading in chunks (say multiple chunks of 8192?)
+    if (n < 0)
+      perror("Error reading from the socket");
+    cout << buffer << endl;
+    close(new_fd);
   }
-  // cout << "got a connection" << endl;
-
-  int n;
-  char buffer[1024];
-
-  memset(buffer, 0, 1024);
-
-  n = read(new_fd, buffer, 1023);
-  if (n < 0)
-    perror("Error reading from the socket");
-  cout << buffer << endl;
-  close(new_fd);
   close(sockfd);
   return 0;
 }
