@@ -22,7 +22,7 @@
 using namespace std;
 
 #define PORT 5000
-#define BACKLOG 5
+#define BACKLOG 10
 
 void throwError(string s){
   perror(s.c_str());
@@ -38,7 +38,7 @@ int main(){
   if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) < 0){
     throwError("socket");
   }
-  
+
   memset((char *) &my_addr, 0, sizeof(my_addr));
 
   my_addr.sin_family = AF_INET;
@@ -48,34 +48,28 @@ int main(){
   if (bind(sockfd, (struct sockaddr *) &my_addr, sizeof(struct sockaddr)) < 0){
     throwError("bind");
   }
-  
+
   if (listen(sockfd, BACKLOG) < 0){
     throwError("listen");
   }
 
-  while(1){
-    sin_size = sizeof(struct sockaddr_in);
-    if ((new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size)) < 0){
-      perror("accept");
-      
-      int n;
-      char buffer[256];
-
-      memset(buffer, 0, 256);
-
-      n = read(new_fd, buffer, 255);
-      if (n < 0)
-        perror("Error reading from the socket");
-      for (int i = 0; i < 255; i++){
-        cout << buffer[i];
-      }
-      cout << endl;
-
-      close(new_fd);
-      close(sockfd);
-      return 0;
-    }
-
-
+  sin_size = sizeof(struct sockaddr_in);
+  // cout << "trying to get a connection" << endl;
+  if ((new_fd = accept(sockfd, (struct sockaddr *) &their_addr, &sin_size)) < 0){
+    throwError("accept");
   }
+  // cout << "got a connection" << endl;
+
+  int n;
+  char buffer[1024];
+
+  memset(buffer, 0, 1024);
+
+  n = read(new_fd, buffer, 1023);
+  if (n < 0)
+    perror("Error reading from the socket");
+  cout << buffer << endl;
+  close(new_fd);
+  close(sockfd);
+  return 0;
 }
