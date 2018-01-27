@@ -31,6 +31,9 @@ string JPG = "Content-Type: image/jpeg\r\n";
 string GIF = "Content-Type: image/gif\r\n";
 string TXT = "Content-Type: text/plain\r\n";
 
+string STATUS_ERROR = "HTTP/1.1 404 Not Found\r\n";
+string STATUS_OK = "HTTP/1.1 200 OK\r\n";
+
 /**
  * This method throws the perror and exits the program
  * @param s A string that is the error message
@@ -122,7 +125,7 @@ void writeResponse(int new_fd) {
   char buffer[8192]; // 8192 is usually the largest size that we may have to
                      // handle
   memset(buffer, 0, 8192);
-  n = read(new_fd, buffer, 8191); // Is there any way to handle reading in
+  n = read(new_fd, buffer, 8191); // TODO: Is there any way to handle reading in
                                   // chunks (say multiple chunks of 8192?)
   if (n < 0)
     perror("Error reading from the socket");
@@ -135,20 +138,22 @@ void writeResponse(int new_fd) {
     return;
   }
 
-  string fileType = parseFileType(fileName);
-  string contentType = "";
-  if (fileType == "HTML")
-    contentType = HTML;
-  else if (fileType == "HTM")
-    contentType = HTM;
-  else if (fileType == "GIF")
-    contentType = GIF;
-  else if (fileType == "JPEG")
-    contentType = JPEG;
-  else if (fileType == "JPG")
-    contentType = JPG;
-  else
-    contentType = TXT;
+  // TODO: Use fstat for reading in file facts?
+  string responseStatus = "";
+  string date = "";
+  string server = "";
+  string lastModified = "";
+  string contentLength = "";
+  string closeConnection = "";
+  string body = "";
+  string contentType = parseFileType(fileName);
+
+  string respHeader = responseStatus + date + server + lastModified +
+                      contentLength + contentType + closeConnection + "\r\n";
+
+  write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
+  // write(new_fd, respHeader.c_str(), respHeader.length());
+  // write(new_fd, body.c_str(), body.length();
 }
 
 string parseFileName(char *buffer) {
@@ -158,7 +163,7 @@ string parseFileName(char *buffer) {
   }
   size_t found = request.find(" ");
   cout << found << endl;
-  size_t found2 = request.find(" /HTTP", found + 1);
+  size_t found2 = request.find(" HTTP", found + 1, 5);
   cout << found2 << endl;
   return found2 - found - 2 > 0 ? request.substr(found + 2, found2 - found - 2)
                                 : "";
@@ -166,15 +171,15 @@ string parseFileName(char *buffer) {
 
 string parseFileType(string file) {
   if (file.find(".html") != string::npos) {
-    return "html";
+    return HTML;
   } else if (file.find(".htm") != string::npos) {
-    return "htm";
+    return HTML;
   } else if (file.find(".gif") != string::npos) {
-    return "gif";
+    return GIF;
   } else if (file.find(".jpeg") != string::npos) {
-    return "jpeg";
+    return JPEG;
   } else if (file.find(".jpg") != string::npos) {
-    return "jpg";
+    return JPG;
   }
-  return "txt"; // by default we will assume everything else is a text file
+  return TXT; // by default we will assume everything else is a text file
 }
