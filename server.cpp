@@ -24,9 +24,12 @@ using namespace std;
 #define PORT 5000
 #define BACKLOG 10
 
+string HTM = "Content-Type: text/html\r\n";
 string HTML = "Content-Type: text/html\r\n";
 string JPEG = "Content-Type: image/jpeg\r\n";
 string JPG = "Content-Type: image/jpeg\r\n";
+string GIF = "Content-Type: image/gif\r\n";
+string TXT = "Content-Type: text/plain\r\n";
 
 /**
  * This method throws the perror and exits the program
@@ -44,9 +47,7 @@ void throwError(string s) {
  * @return string A string representing the file that was found, or an empty
  *string if no file was found.
  **/
-string parseFileName(char *buffer) {
-  return "a"; // placeholder
-}
+string parseFileName(char *buffer);
 
 /**
  * This method will write the return response back to the browser (and show the
@@ -54,9 +55,16 @@ string parseFileName(char *buffer) {
  * correct file/image that needs to be shown).
  * Look into chapter 2 for writing proper HTTP responses (apparently people get
  *points off here!)
- * @param ?? What might we need?
+ * @param new_fd  The file descriptor of the connected socket
  **/
-void writeResponse();
+void writeResponse(int new_fd);
+
+/**
+ * This method will get the file type of the requested file.
+ * @param file The string which contains the full file name
+ * @return string The filetype of the requested file
+ **/
+string parseFileType(string file);
 
 int main() {
   int sockfd, new_fd;
@@ -94,28 +102,79 @@ int main() {
 
     if (pid == 0) {
       // child process
-      writeResponse();
+      close(sockfd);
+      writeResponse(new_fd);
+      close(new_fd);
+      exit(0);
     } else if (pid > 0) {
       // parent process
+      close(new_fd);
       continue;
     } else {
       throwError("Fork failed, closing the program");
-      return 1;
     }
   }
-  close(sockfd);
   return 0;
 }
 
-// int n;
-// char buffer[8192]; // 8192 is usually the largest size that we may have to
-//                    // handle/
+void writeResponse(int new_fd) {
+  int n;
+  char buffer[8192]; // 8192 is usually the largest size that we may have to
+                     // handle
+  memset(buffer, 0, 8192);
+  n = read(new_fd, buffer, 8191); // Is there any way to handle reading in
+                                  // chunks (say multiple chunks of 8192?)
+  if (n < 0)
+    perror("Error reading from the socket");
+  cout << buffer << endl;
+  string fileName = parseFileName(buffer);
+  cout << fileName << endl;
 
-// memset(buffer, 0, 8192);
+  // sometimes we get random requests that don't actually have any input headers
+  if (fileName == "") {
+    return;
+  }
 
-// n = read(new_fd, buffer, 8191); // Is there any way to handle reading in
-//                                 // chunks (say multiple chunks of 8192?)
-// if (n < 0)
-//   perror("Error reading from the socket");
-// cout << buffer << endl;
-// close(new_fd);
+  string fileType = parseFileType(fileName);
+  string contentType = "";
+  if (fileType == "HTML")
+    contentType = HTML;
+  else if (fileType == "HTM")
+    contentType = HTM;
+  else if (fileType == "GIF")
+    contentType = GIF;
+  else if (fileType == "JPEG")
+    contentType = JPEG;
+  else if (fileType == "JPG")
+    contentType = JPG;
+  else
+    contentType = TXT;
+}
+
+string parseFileName(char *buffer) {
+  string request(buffer);
+  if (request == "") {
+    return "";
+  }
+  size_t found = request.find(" ");
+  cout << found << endl;
+  size_t found2 = request.find(" /HTTP", found + 1);
+  cout << found2 << endl;
+  return found2 - found - 2 > 0 ? request.substr(found + 2, found2 - found - 2)
+                                : "";
+}
+
+string parseFileType(string file) {
+  if (file.find(".html") != string::npos) {
+    return "html";
+  } else if (file.find(".htm") != string::npos) {
+    return "htm";
+  } else if (file.find(".gif") != string::npos) {
+    return "gif";
+  } else if (file.find(".jpeg") != string::npos) {
+    return "jpeg";
+  } else if (file.find(".jpg") != string::npos) {
+    return "jpg";
+  }
+  return "txt"; // by default we will assume everything else is a text file
+}
