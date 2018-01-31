@@ -123,12 +123,13 @@ int main() {
 }
 
 void writeResponse(int new_fd) {
-  int n, file_fd;
+  int n, file_fd, bytesRead;
   struct stat fileInfo;
   time_t t;
   struct tm* timeTm, modifyTm;
   char currTime[34];
   char modifyTime[34];
+  char * fileBuffer;
   char buffer[8192]; // 8192 is usually the largest size that we may have to
                      // handle
   memset(buffer, 0, 8192);
@@ -143,14 +144,25 @@ void writeResponse(int new_fd) {
   if (fileName == "") {
     return;
   }
-  // TODO: open file for reading
+
   file_fd = open(fileName, O_RDONLY);
   if (file_fd < 0){
-  	responseStatus = "404";
+  	write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
+  	return;
   }
 
   if(fstat(file_fd, &fileInfo) < 0){
   	throwError("bad file")
+  }
+
+  ifstream reqFile (fileName, ios::in|ios::binary|ios::ate);
+  streampos fileSize;
+  if(reqFile.is_open()){
+  	fileSize = reqFile.tellg();
+  	fileBuffer = new char [fileSize];
+  	reqFile.seekg (0, ios::beg);
+    reqFile.read (fileBuffer, fileSize);
+    reqFile.close();
   }
 
   t = time(NULL);
@@ -159,7 +171,6 @@ void writeResponse(int new_fd) {
   strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n", timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
   strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
 
-
   // TODO: Use fstat for reading in file facts
   string responseStatus = "";
   string date = currTime;
@@ -167,7 +178,7 @@ void writeResponse(int new_fd) {
   string lastModified = "modifyTime";
   string contentLength = string(fileInfo.st_size);
   string closeConnection = "";
-  string body = "";
+  string body = fileBuffer;
   string contentType = parseFileType(fileName);
 
   string respHeader = responseStatus + date + server + lastModified +
@@ -176,6 +187,7 @@ void writeResponse(int new_fd) {
   write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
   // write(new_fd, respHeader.c_str(), respHeader.length());
   // write(new_fd, body.c_str(), body.length();
+  delete[] fileBuffer;
 }
 
 string parseFileName(char *buffer) {
