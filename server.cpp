@@ -18,6 +18,7 @@
 #include <strings.h>
 #include <signal.h>
 #include <string>
+#include <time.h>
 
 using namespace std;
 
@@ -95,6 +96,7 @@ int main() {
 
   sin_size = sizeof(struct sockaddr_in);
 
+  // TODO: reap child process and register signal handler
   while (1) {
     if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size)) <
         0) {
@@ -121,14 +123,18 @@ int main() {
 }
 
 void writeResponse(int new_fd) {
-  int n;
+  int n, file_fd;
+  struct stat fileInfo;
+  time_t t;
+  struct tm* timeTm, modifyTm;
+  char currTime[34];
+  char modifyTime[34];
   char buffer[8192]; // 8192 is usually the largest size that we may have to
                      // handle
   memset(buffer, 0, 8192);
-  n = read(new_fd, buffer, 8191); // TODO: Is there any way to handle reading in
-                                  // chunks (say multiple chunks of 8192?)
+  n = read(new_fd, buffer, 8192);
   if (n < 0)
-    perror("Error reading from the socket");
+   	perror("Error reading from the socket");
   cout << buffer << endl;
   string fileName = parseFileName(buffer);
   cout << fileName << endl;
@@ -137,13 +143,29 @@ void writeResponse(int new_fd) {
   if (fileName == "") {
     return;
   }
+  // TODO: open file for reading
+  file_fd = open(fileName, O_RDONLY);
+  if (file_fd < 0){
+  	responseStatus = "404";
+  }
 
-  // TODO: Use fstat for reading in file facts?
+  if(fstat(file_fd, &fileInfo) < 0){
+  	throwError("bad file")
+  }
+
+  t = time(NULL);
+  timeTm = gmtime(&t);
+  modifyTm = gmtime(fileInfo.st_mtime);
+  strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n", timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
+  strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
+
+
+  // TODO: Use fstat for reading in file facts
   string responseStatus = "";
-  string date = "";
-  string server = "";
-  string lastModified = "";
-  string contentLength = "";
+  string date = currTime;
+  string server = "Gandhi-Jasapara Server";
+  string lastModified = "modifyTime";
+  string contentLength = string(fileInfo.st_size);
   string closeConnection = "";
   string body = "";
   string contentType = parseFileType(fileName);
@@ -163,7 +185,7 @@ string parseFileName(char *buffer) {
   }
   size_t found = request.find(" ");
   cout << found << endl;
-  size_t found2 = request.find(" HTTP", found + 1, 5);
+  size_t found2 = request.find(" HTTP", found + 1, 5); // TODO: make more ROBUST
   cout << found2 << endl;
   return found2 - found - 2 > 0 ? request.substr(found + 2, found2 - found - 2)
                                 : "";
