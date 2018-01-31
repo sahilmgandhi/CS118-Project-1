@@ -130,8 +130,7 @@ void writeResponse(int new_fd) {
   char currTime[34];
   char modifyTime[34];
   char * fileBuffer;
-  char buffer[8192]; // 8192 is usually the largest size that we may have to
-                     // handle
+  char buffer[8192]; // 8192 is usually the largest request size we have to handle
   memset(buffer, 0, 8192);
   n = read(new_fd, buffer, 8192);
   if (n < 0)
@@ -150,7 +149,6 @@ void writeResponse(int new_fd) {
   	write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
   	return;
   }
-
   if(fstat(file_fd, &fileInfo) < 0){
   	throwError("bad file")
   }
@@ -171,14 +169,14 @@ void writeResponse(int new_fd) {
   strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n", timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
   strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
 
-  // TODO: Use fstat for reading in file facts
+  // TODO: Update responseStatus and closeConnection
   string responseStatus = "";
-  string date = currTime;
+  string date (currTime);
   string server = "Gandhi-Jasapara Server";
-  string lastModified = "modifyTime";
+  string lastModified(modifyTime);
   string contentLength = string(fileInfo.st_size);
   string closeConnection = "";
-  string body = fileBuffer;
+  string body (fileBuffer);
   string contentType = parseFileType(fileName);
 
   string respHeader = responseStatus + date + server + lastModified +
