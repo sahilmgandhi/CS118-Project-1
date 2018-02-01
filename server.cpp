@@ -21,6 +21,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <locale>
+#include <fstream>
 
 using namespace std;
 
@@ -126,11 +127,10 @@ int main() {
 }
 
 void writeResponse(int new_fd) {
-  int n, file_fd, bytesRead;
+  int n, file_fd;
   struct stat fileInfo;
   time_t t;
-  struct tm *timeTm;
-  struct tm *modifyTm;
+  struct tm *timeTm, *modifyTm;
   char currTime[34];
   char modifyTime[34];
   char *fileBuffer;
@@ -150,20 +150,17 @@ void writeResponse(int new_fd) {
     return;
   }
 
-  // TODO: clean filename into replacing %20 to an empty space
-
-  file_fd = open(fileName.c_str(), O_RDONLY, 511);
+  file_fd = open(fileName.c_str(), O_RDONLY);
   if (file_fd < 0) {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
     return;
   }
   if (fstat(file_fd, &fileInfo) < 0) {
-    write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
     throwError("bad file");
   }
 
-  ifstream inFile;
-  inFile.open(fileName, ios::in | ios::binary | ios::ate);
+  ifstream reqFile;
+  reqFile.open(fileName, ios::in | ios::binary | ios::ate);
   streampos fileSize;
   if (inFile.is_open()) {
     fileSize = inFile.tellg();
@@ -176,7 +173,7 @@ void writeResponse(int new_fd) {
   time_t modTime = fileInfo.st_mtime;
   t = time(NULL);
   timeTm = gmtime(&t);
-  modifyTm = gmtime(modTime);
+  modifyTm = gmtime(&fileInfo.st_mtime);
   strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n",
            timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
   strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
@@ -186,7 +183,7 @@ void writeResponse(int new_fd) {
   string date(currTime);
   string server = "Server: Gandhi-Jasapara Server\r\n";
   string lastModified(modifyTime);
-  string contentLength = string(fileInfo.st_size);
+  string contentLength = to_string(fileInfo.st_size);
   string closeConnection = "Connection: close\r\n";
   string body(fileBuffer);
   body += "\r\n";
@@ -198,6 +195,7 @@ void writeResponse(int new_fd) {
   write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
   // write(new_fd, respHeader.c_str(), respHeader.length());
   // write(new_fd, body.c_str(), body.length();
+  close(file_fd);
   delete[] fileBuffer;
 }
 
