@@ -131,8 +131,8 @@ void writeResponse(int new_fd) {
   struct stat fileInfo;
   time_t t;
   struct tm *timeTm, *modifyTm;
-  char currTime[34];
-  char modifyTime[34];
+  char currTime[100];
+  char modifyTime[100];
   char *fileBuffer;
   char buffer[8192]; // 8192 is usually the largest request size we have to
                      // handle
@@ -172,29 +172,37 @@ void writeResponse(int new_fd) {
 
   t = time(NULL);
   timeTm = gmtime(&t);
-  modifyTm = gmtime(&fileInfo.st_mtime);
-  strftime(currTime, 34, "Date: %a, %d %b %G %T GMT\r\n",
+  strftime(currTime, sizeof(currTime), "Date: %a, %d %b %G %T GMT",
            timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
-  strftime(modifyTime, 34, "Last-Modified: %a, %d %b %G %T GMT\r\n", modifyTm);
+  modifyTm = gmtime(&fileInfo.st_mtime);
+  strftime(modifyTime, sizeof(modifyTime), "Last-Modified: %a, %d %b %G %T GMT",
+           modifyTm);
 
   // TODO: Update responseStatus and closeConnection
   string responseStatus = STATUS_OK;
   string date(currTime);
+  date += "\r\n";
   string server = "Server: Gandhi-Jasapara Server\r\n";
   string lastModified(modifyTime);
+  lastModified += "\r\n";
   long long fileLength = fileInfo.st_size;
   char cLength[1000];
   sprintf(cLength, "Content-length: %lld\r\n", fileLength);
   string contentLength(cLength);
   string closeConnection = "Connection: close\r\n";
+  string contentDisposition = "Content-Disposition: inline\r\n";
   string body(fileBuffer);
-  body += "\r\n";
   string contentType = parseFileType(fileName);
 
   string respHeader = responseStatus + date + server + lastModified +
-                      contentLength + contentType + closeConnection + "\r\n";
+                      contentLength + contentType + contentDisposition +
+                      closeConnection + "\r\n";
+  // string respHeader =
+  //     responseStatus + contentLength + contentType + closeConnection +
+  //     "\r\n";
 
-  // write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
+  cout << respHeader << endl;
+  cout << body << endl;
   write(new_fd, respHeader.c_str(), respHeader.length());
   write(new_fd, body.c_str(), body.length());
   close(file_fd);
@@ -218,9 +226,11 @@ string parseFileType(string inputFile) {
   string file = "";
 
   // Make the file case insensitive
-  for (unsigned int i = 0; i < file.length(); i++) {
+  for (unsigned int i = 0; i < inputFile.length(); i++) {
     file += tolower(inputFile[i]);
   }
+
+  cout << file << endl;
 
   if (file.find(".html") != string::npos) {
     return HTML;
@@ -232,6 +242,8 @@ string parseFileType(string inputFile) {
     return JPEG;
   } else if (file.find(".jpg") != string::npos) {
     return JPG;
+  } else if (file.find(".txt") != string::npos) {
+    return TXT;
   }
   return BINARY; // by default we will assume everything else is a text file
 }
