@@ -19,6 +19,8 @@
 #include <signal.h>
 #include <string>
 #include <time.h>
+#include <fcntl.h>
+#include <fstream>
 
 using namespace std;
 
@@ -123,10 +125,10 @@ int main() {
 }
 
 void writeResponse(int new_fd) {
-  int n, file_fd, bytesRead;
+  int n, file_fd;
   struct stat fileInfo;
   time_t t;
-  struct tm* timeTm, modifyTm;
+  struct tm* timeTm, *modifyTm;
   char currTime[34];
   char modifyTime[34];
   char * fileBuffer;
@@ -144,16 +146,17 @@ void writeResponse(int new_fd) {
     return;
   }
 
-  file_fd = open(fileName, O_RDONLY);
+  file_fd = open(fileName.c_str(), O_RDONLY);
   if (file_fd < 0){
   	write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
   	return;
   }
   if(fstat(file_fd, &fileInfo) < 0){
-  	throwError("bad file")
+  	throwError("bad file");
   }
 
-  ifstream reqFile (fileName, ios::in|ios::binary|ios::ate);
+  ifstream reqFile;
+  reqFile.open(fileName, ios::in|ios::binary|ios::ate);
   streampos fileSize;
   if(reqFile.is_open()){
   	fileSize = reqFile.tellg();
@@ -165,7 +168,7 @@ void writeResponse(int new_fd) {
 
   t = time(NULL);
   timeTm = gmtime(&t);
-  modifyTm = gmtime(fileInfo.st_mtime);
+  modifyTm = gmtime(&fileInfo.st_mtime);
   strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n", timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
   strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
 
@@ -174,7 +177,7 @@ void writeResponse(int new_fd) {
   string date (currTime);
   string server = "Gandhi-Jasapara Server";
   string lastModified(modifyTime);
-  string contentLength = string(fileInfo.st_size);
+  string contentLength = to_string(fileInfo.st_size);
   string closeConnection = "";
   string body (fileBuffer);
   string contentType = parseFileType(fileName);
@@ -185,6 +188,7 @@ void writeResponse(int new_fd) {
   write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
   // write(new_fd, respHeader.c_str(), respHeader.length());
   // write(new_fd, body.c_str(), body.length();
+  close(file_fd);
   delete[] fileBuffer;
 }
 
