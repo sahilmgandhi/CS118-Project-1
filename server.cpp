@@ -19,6 +19,8 @@
 #include <signal.h>
 #include <string>
 #include <time.h>
+#include <fcntl.h>
+#include <locale>
 
 using namespace std;
 
@@ -31,6 +33,7 @@ string JPEG = "Content-Type: image/jpeg\r\n";
 string JPG = "Content-Type: image/jpeg\r\n";
 string GIF = "Content-Type: image/gif\r\n";
 string TXT = "Content-Type: text/plain\r\n";
+string BINARY = "Content-Type: application/octet-stream\r\n";
 
 string STATUS_ERROR = "HTTP/1.1 404 Not Found\r\n";
 string STATUS_OK = "HTTP/1.1 200 OK\r\n";
@@ -126,57 +129,67 @@ void writeResponse(int new_fd) {
   int n, file_fd, bytesRead;
   struct stat fileInfo;
   time_t t;
-  struct tm* timeTm, modifyTm;
+  struct tm *timeTm;
+  struct tm *modifyTm;
   char currTime[34];
   char modifyTime[34];
-  char * fileBuffer;
-  char buffer[8192]; // 8192 is usually the largest request size we have to handle
+  char *fileBuffer;
+  char buffer[8192]; // 8192 is usually the largest request size we have to
+                     // handle
   memset(buffer, 0, 8192);
   n = read(new_fd, buffer, 8192);
   if (n < 0)
-   	perror("Error reading from the socket");
+    perror("Error reading from the socket");
   cout << buffer << endl;
   string fileName = parseFileName(buffer);
   cout << fileName << endl;
 
   // sometimes we get random requests that don't actually have any input headers
   if (fileName == "") {
+    write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
     return;
   }
 
-  file_fd = open(fileName, O_RDONLY);
-  if (file_fd < 0){
-  	write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
-  	return;
+  // TODO: clean filename into replacing %20 to an empty space
+
+  file_fd = open(fileName.c_str(), O_RDONLY, 511);
+  if (file_fd < 0) {
+    write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
+    return;
   }
-  if(fstat(file_fd, &fileInfo) < 0){
-  	throwError("bad file")
+  if (fstat(file_fd, &fileInfo) < 0) {
+    write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
+    throwError("bad file");
   }
 
-  ifstream reqFile (fileName, ios::in|ios::binary|ios::ate);
+  ifstream inFile;
+  inFile.open(fileName, ios::in | ios::binary | ios::ate);
   streampos fileSize;
-  if(reqFile.is_open()){
-  	fileSize = reqFile.tellg();
-  	fileBuffer = new char [fileSize];
-  	reqFile.seekg (0, ios::beg);
-    reqFile.read (fileBuffer, fileSize);
-    reqFile.close();
+  if (inFile.is_open()) {
+    fileSize = inFile.tellg();
+    fileBuffer = new char[fileSize];
+    inFile.seekg(0, ios::beg);
+    inFile.read(fileBuffer, fileSize);
+    inFile.close();
   }
 
+  time_t modTime = fileInfo.st_mtime;
   t = time(NULL);
   timeTm = gmtime(&t);
-  modifyTm = gmtime(fileInfo.st_mtime);
-  strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n", timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
+  modifyTm = gmtime(modTime);
+  strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n",
+           timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
   strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
 
   // TODO: Update responseStatus and closeConnection
   string responseStatus = "";
-  string date (currTime);
-  string server = "Gandhi-Jasapara Server";
+  string date(currTime);
+  string server = "Server: Gandhi-Jasapara Server\r\n";
   string lastModified(modifyTime);
   string contentLength = string(fileInfo.st_size);
-  string closeConnection = "";
-  string body (fileBuffer);
+  string closeConnection = "Connection: close\r\n";
+  string body(fileBuffer);
+  body += "\r\n";
   string contentType = parseFileType(fileName);
 
   string respHeader = responseStatus + date + server + lastModified +
@@ -201,7 +214,14 @@ string parseFileName(char *buffer) {
                                 : "";
 }
 
-string parseFileType(string file) {
+string parseFileType(string inputFile) {
+  string file = "";
+
+  // Make the file case insensitive
+  for (int i = 0; i < file.length(); i++) {
+    file += tolower(inputFile[i]);
+  }
+
   if (file.find(".html") != string::npos) {
     return HTML;
   } else if (file.find(".htm") != string::npos) {
@@ -213,5 +233,5 @@ string parseFileType(string file) {
   } else if (file.find(".jpg") != string::npos) {
     return JPG;
   }
-  return TXT; // by default we will assume everything else is a text file
+  return BINARY; // by default we will assume everything else is a text file
 }
