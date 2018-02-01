@@ -3,6 +3,12 @@
 // Project 1
 // This is the server code for the first project.
 
+// TODO 1: Remove random couts, but keep/add couts for main things like error
+// status, request and response, and anything else neccesary
+// TODO 2: Test using arbritrary large files, and files with case insensitive
+// names
+// TODO 3: Think of other corner cases to test??
+
 #include <iostream>
 #include <unistd.h>
 #include <stdio.h>
@@ -74,6 +80,15 @@ void writeResponse(int new_fd);
  **/
 string parseFileType(string file);
 
+/**
+ * This method will reap zombie processes (signal handler for it)
+ * @param sig   The signal for the signal handler
+ **/
+void handle_sigchild(int sig) {
+  while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {
+  }
+}
+
 int main() {
   int sockfd, new_fd;
   struct sockaddr_in my_addr;
@@ -100,7 +115,13 @@ int main() {
 
   sin_size = sizeof(struct sockaddr_in);
 
-  // TODO: reap child process and register signal handler
+  struct sigaction sa;
+  sa.sa_handler = &handle_sigchild;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+  if (sigaction(SIGCHLD, &sa, 0) == -1) {
+    throwError("Sigaction");
+  }
   while (1) {
     if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size)) <
         0) {
@@ -142,17 +163,26 @@ void writeResponse(int new_fd) {
     perror("Error reading from the socket");
   cout << buffer << endl;
   string fileName = parseFileName(buffer);
-  cout << fileName << endl;
 
+  // cout << fileName << endl;
   // sometimes we get random requests that don't actually have any input headers
   if (fileName == "") {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
     return;
   }
 
+  // Change %20 to white spaces in fileName if it exists
+  for (string::size_type i = 0;
+       (i = fileName.find("%20", i)) != string::npos;) {
+    fileName.replace(i, 3, " ");
+    i += 1;
+  }
+  // cout << fileName << endl << endl;
+
   file_fd = open(fileName.c_str(), O_RDONLY);
   if (file_fd < 0) {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
+    cout << "Could not open file" << endl;
     return;
   }
   if (fstat(file_fd, &fileInfo) < 0) {
@@ -178,7 +208,6 @@ void writeResponse(int new_fd) {
   strftime(modifyTime, sizeof(modifyTime), "Last-Modified: %a, %d %b %G %T GMT",
            modifyTm);
 
-  // TODO: Update responseStatus and closeConnection
   string responseStatus = STATUS_OK;
   string date(currTime);
   date += "\r\n";
@@ -191,7 +220,6 @@ void writeResponse(int new_fd) {
   string contentLength(cLength);
   string closeConnection = "Connection: close\r\n";
   string contentDisposition = "Content-Disposition: inline\r\n";
-  string body(fileBuffer);
   string contentType = parseFileType(fileName);
 
   string respHeader = responseStatus + date + server + lastModified +
@@ -202,9 +230,8 @@ void writeResponse(int new_fd) {
   //     "\r\n";
 
   cout << respHeader << endl;
-  cout << body << endl;
   write(new_fd, respHeader.c_str(), respHeader.length());
-  write(new_fd, body.c_str(), body.length());
+  write(new_fd, fileBuffer, fileLength);
   close(file_fd);
   delete[] fileBuffer;
 }
@@ -215,9 +242,7 @@ string parseFileName(char *buffer) {
     return "";
   }
   size_t found = request.find(" ");
-  // cout << found << endl;
-  size_t found2 = request.find(" HTTP", found + 1, 5); // TODO: make more ROBUST
-  // cout << found2 << endl;
+  size_t found2 = request.find(" HTTP/1.1\r\n", found + 1, 10);
   return found2 - found - 2 > 0 ? request.substr(found + 2, found2 - found - 2)
                                 : "";
 }
