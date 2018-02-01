@@ -159,31 +159,33 @@ void writeResponse(int new_fd) {
     throwError("bad file");
   }
 
-  ifstream reqFile;
-  reqFile.open(fileName, ios::in | ios::binary | ios::ate);
+  ifstream inFile;
+  inFile.open(fileName.c_str(), ios::in | ios::binary | ios::ate);
   streampos fileSize;
   if (inFile.is_open()) {
     fileSize = inFile.tellg();
-    fileBuffer = new char[fileSize];
+    fileBuffer = new char[fileSize + 1];
     inFile.seekg(0, ios::beg);
     inFile.read(fileBuffer, fileSize);
     inFile.close();
   }
 
-  time_t modTime = fileInfo.st_mtime;
   t = time(NULL);
   timeTm = gmtime(&t);
   modifyTm = gmtime(&fileInfo.st_mtime);
-  strftime(currTime, 34, "%a, %d %b %G %T GMT\r\n",
+  strftime(currTime, 34, "Date: %a, %d %b %G %T GMT\r\n",
            timeTm); // Sun, 26 Sep 2010 20:09:20 GMT\r\n format
-  strftime(modifyTime, 34, "%a, %d %b %G %T GMT\r\n", modifyTm);
+  strftime(modifyTime, 34, "Last-Modified: %a, %d %b %G %T GMT\r\n", modifyTm);
 
   // TODO: Update responseStatus and closeConnection
-  string responseStatus = "";
+  string responseStatus = STATUS_OK;
   string date(currTime);
   string server = "Server: Gandhi-Jasapara Server\r\n";
   string lastModified(modifyTime);
-  string contentLength = to_string(fileInfo.st_size);
+  long long fileLength = fileInfo.st_size;
+  char cLength[1000];
+  sprintf(cLength, "Content-length: %lld\r\n", fileLength);
+  string contentLength(cLength);
   string closeConnection = "Connection: close\r\n";
   string body(fileBuffer);
   body += "\r\n";
@@ -192,9 +194,9 @@ void writeResponse(int new_fd) {
   string respHeader = responseStatus + date + server + lastModified +
                       contentLength + contentType + closeConnection + "\r\n";
 
-  write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
-  // write(new_fd, respHeader.c_str(), respHeader.length());
-  // write(new_fd, body.c_str(), body.length();
+  // write(new_fd, STATUS_OK.c_str(), STATUS_OK.length());
+  write(new_fd, respHeader.c_str(), respHeader.length());
+  write(new_fd, body.c_str(), body.length());
   close(file_fd);
   delete[] fileBuffer;
 }
@@ -205,9 +207,9 @@ string parseFileName(char *buffer) {
     return "";
   }
   size_t found = request.find(" ");
-  cout << found << endl;
+  // cout << found << endl;
   size_t found2 = request.find(" HTTP", found + 1, 5); // TODO: make more ROBUST
-  cout << found2 << endl;
+  // cout << found2 << endl;
   return found2 - found - 2 > 0 ? request.substr(found + 2, found2 - found - 2)
                                 : "";
 }
@@ -216,7 +218,7 @@ string parseFileType(string inputFile) {
   string file = "";
 
   // Make the file case insensitive
-  for (int i = 0; i < file.length(); i++) {
+  for (unsigned int i = 0; i < file.length(); i++) {
     file += tolower(inputFile[i]);
   }
 
