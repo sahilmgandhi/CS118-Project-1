@@ -153,8 +153,7 @@ void writeResponse(int new_fd) {
   char currTime[100];
   char modifyTime[100];
   char *fileBuffer;
-  char buffer[8192]; // 8192 is usually the largest request size we have to
-                     // handle
+  char buffer[8192]; // 8192 is usually the largest request size we have to handle
   memset(buffer, 0, 8192);
   n = read(new_fd, buffer, 8192);
   if (n < 0)
@@ -221,9 +220,6 @@ void writeResponse(int new_fd) {
   string respHeader = responseStatus + date + server + lastModified +
                       contentLength + contentType + contentDisposition +
                       closeConnection + "\r\n";
-  // string respHeader =
-  //     responseStatus + contentLength + contentType + closeConnection +
-  //     "\r\n";
 
   cout << respHeader << endl;
   write(new_fd, respHeader.c_str(), respHeader.length());
