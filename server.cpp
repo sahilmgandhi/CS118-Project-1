@@ -3,8 +3,7 @@
 // Project 1
 // This is the server code for the first project.
 
-// TODO 2: Test using arbritrary large files, and files with case insensitive
-// names
+// TODO 2: Test using files with case insensitive names
 // TODO 3: Think of other corner cases to test??
 
 #include <iostream>
@@ -39,6 +38,14 @@ string JPG = "Content-Type: image/jpeg\r\n";
 string GIF = "Content-Type: image/gif\r\n";
 string TXT = "Content-Type: text/plain\r\n";
 string BINARY = "Content-Type: application/octet-stream\r\n";
+string PDF = "Content-Type: application/pdf\r\n";
+string MP4 = "Content-Type: video/mp4\r\n";
+string PNG = "Content-Type: image/png\r\n";
+string CSS = "Content-Type: text/CSS\r\n";
+string WMV = "Content-Type: video/x-ms-wmv\r\n";
+string WAV = "Content-Type: audio/x-wav\r\n";
+string AAC = "Content-Type: audio/x-aac\r\n";
+string WMA = "Content-Type: audio/x-ms-wma\r\n";
 
 string STATUS_ERROR = "HTTP/1.1 404 Not Found\r\n";
 string STATUS_OK = "HTTP/1.1 200 OK\r\n";
@@ -83,8 +90,11 @@ string parseFileType(string file);
  * @param sig   The signal for the signal handler
  **/
 void handle_sigchild(int sig) {
-  while (waitpid((pid_t)(-1), 0, WNOHANG) > 0);
-  fprintf(stderr, "Child exited successfully with code %d\n", sig);
+  while (waitpid((pid_t)(-1), 0, WNOHANG) > 0)
+    ;
+  fprintf(stderr,
+          "Child exited successfully with code %d. Reaped child process.\n",
+          sig);
 }
 
 int main() {
@@ -93,6 +103,7 @@ int main() {
   struct sockaddr_in their_addr;
   socklen_t sin_size;
 
+  // Initiate the connection:
   if ((sockfd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
     throwError("socket");
   }
@@ -113,6 +124,7 @@ int main() {
 
   sin_size = sizeof(struct sockaddr_in);
 
+  // Set up signal handler:
   struct sigaction sa;
   sa.sa_handler = &handle_sigchild;
   sigemptyset(&sa.sa_mask);
@@ -120,6 +132,8 @@ int main() {
   if (sigaction(SIGCHLD, &sa, 0) == -1) {
     throwError("Sig action");
   }
+
+  // Start listening in on connections:
   while (1) {
     if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size)) <
         0) {
@@ -153,12 +167,15 @@ void writeResponse(int new_fd) {
   char currTime[100];
   char modifyTime[100];
   char *fileBuffer;
-  char buffer[8192]; // 8192 is usually the largest request size we have to handle
+  char buffer[8192]; // 8192 is usually the largest request size we have to
+                     // handle
   memset(buffer, 0, 8192);
   n = read(new_fd, buffer, 8192);
   if (n < 0)
     perror("Error reading from the socket");
-  cout << buffer << endl;
+
+  cout << buffer << endl; // Print out the request for the user
+
   string fileName = parseFileName(buffer);
 
   // sometimes we get random requests that don't actually have any input headers
@@ -174,16 +191,18 @@ void writeResponse(int new_fd) {
     i += 1;
   }
 
+  // Open file and stat it
   file_fd = open(fileName.c_str(), O_RDONLY);
   if (file_fd < 0) {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
-    fprintf(stderr,"Could not open file\n");
+    fprintf(stderr, "Could not open file\n");
     return;
   }
   if (fstat(file_fd, &fileInfo) < 0) {
     throwError("bad file");
   }
 
+  // Read in the file and store it into a buffer
   ifstream inFile;
   inFile.open(fileName.c_str(), ios::in | ios::binary | ios::ate);
   streampos fs;
@@ -195,6 +214,7 @@ void writeResponse(int new_fd) {
     inFile.close();
   }
 
+  // Create the date strings
   t = time(NULL);
   timeTm = gmtime(&t);
   strftime(currTime, sizeof(currTime), "Date: %a, %d %b %G %T GMT",
@@ -203,6 +223,7 @@ void writeResponse(int new_fd) {
   strftime(modifyTime, sizeof(modifyTime), "Last-Modified: %a, %d %b %G %T GMT",
            modifyTm);
 
+  // Other required strings for the response header
   string responseStatus = STATUS_OK;
   string date(currTime);
   date += "\r\n";
@@ -221,7 +242,10 @@ void writeResponse(int new_fd) {
                       contentLength + contentType + contentDisposition +
                       closeConnection + "\r\n";
 
-  cout << respHeader << endl;
+  cout << respHeader << endl; // Print out the resp header to show the user
+
+  // Write the response header and body out to the server, and close the
+  // connection and clear heap allocated space
   write(new_fd, respHeader.c_str(), respHeader.length());
   write(new_fd, fileBuffer, fileLength);
   close(file_fd);
@@ -259,6 +283,23 @@ string parseFileType(string inputFile) {
     return JPG;
   } else if (file.find(".txt") != string::npos) {
     return TXT;
+  } else if (file.find(".pdf") != string::npos) {
+    return PDF;
+  } else if (file.find(".mp4") != string::npos) {
+    return MP4;
+  } else if (file.find(".png") != string::npos) {
+    return PNG;
+  } else if (file.find(".css") != string::npos) {
+    return CSS;
+  } else if (file.find(".WMV") != string::npos) {
+    return WMV;
+  } else if (file.find(".wav") != string::npos) {
+    return WAV;
+  } else if (file.find(".aac") != string::npos) {
+    return AAC;
+  } else if (file.find(".wma") != string::npos) {
+    return WMA;
   }
+
   return BINARY; // by default we will assume everything else is a text file
 }
