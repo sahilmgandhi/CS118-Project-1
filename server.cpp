@@ -44,7 +44,15 @@ string WAV = "Content-Type: audio/x-wav\r\n";
 string AAC = "Content-Type: audio/x-aac\r\n";
 string WMA = "Content-Type: audio/x-ms-wma\r\n";
 
-string STATUS_ERROR = "HTTP/1.1 404 Not Found\r\n";
+string STATUS_ERROR = "HTTP/1.1 404 Not Found\r\n" + HTML +
+                      "Content-length: 327\r\n" + "\r\n" + "<!doctype HTML>\n\
+<html>\n<head><title> 404 File Not Found</title></head>\n\n\
+<body><h1> 404 File NOT Found.</h1><p> The file that you \
+requested has unfortunately not been found or \
+could not be sent. Please make sure that you are typing it correctly (\
+including the spaces, capital / lowecase letters, \
+and more!).</p></body>\n\
+</html>\n ";
 string STATUS_OK = "HTTP/1.1 200 OK\r\n";
 
 /**
@@ -175,7 +183,8 @@ void writeResponse(int new_fd) {
 
   string fileName = parseFileName(buffer);
 
-  // sometimes we get random requests that don't actually have any input headers
+  /// sometimes we get random requests that don't actually have any input
+  /// headers
   if (fileName == "") {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
     return;
