@@ -3,8 +3,6 @@
 // Project 1
 // This is the server code for the first project.
 
-// TODO 1: Remove random couts, but keep/add couts for main things like error
-// status, request and response, and anything else neccesary
 // TODO 2: Test using arbritrary large files, and files with case insensitive
 // names
 // TODO 3: Think of other corner cases to test??
@@ -85,8 +83,8 @@ string parseFileType(string file);
  * @param sig   The signal for the signal handler
  **/
 void handle_sigchild(int sig) {
-  while (waitpid((pid_t)(-1), 0, WNOHANG) > 0) {
-  }
+  while (waitpid((pid_t)(-1), 0, WNOHANG) > 0);
+  fprintf(stderr, "Child exited successfully with code %d\n", sig);
 }
 
 int main() {
@@ -120,7 +118,7 @@ int main() {
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
   if (sigaction(SIGCHLD, &sa, 0) == -1) {
-    throwError("Sigaction");
+    throwError("Sig action");
   }
   while (1) {
     if ((new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size)) <
@@ -164,7 +162,6 @@ void writeResponse(int new_fd) {
   cout << buffer << endl;
   string fileName = parseFileName(buffer);
 
-  // cout << fileName << endl;
   // sometimes we get random requests that don't actually have any input headers
   if (fileName == "") {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
@@ -177,12 +174,11 @@ void writeResponse(int new_fd) {
     fileName.replace(i, 3, " ");
     i += 1;
   }
-  // cout << fileName << endl << endl;
 
   file_fd = open(fileName.c_str(), O_RDONLY);
   if (file_fd < 0) {
     write(new_fd, STATUS_ERROR.c_str(), STATUS_ERROR.length());
-    cout << "Could not open file" << endl;
+    fprintf(stderr,"Could not open file\n");
     return;
   }
   if (fstat(file_fd, &fileInfo) < 0) {
@@ -191,12 +187,12 @@ void writeResponse(int new_fd) {
 
   ifstream inFile;
   inFile.open(fileName.c_str(), ios::in | ios::binary | ios::ate);
-  streampos fileSize;
+  streampos fs;
   if (inFile.is_open()) {
-    fileSize = inFile.tellg();
-    fileBuffer = new char[fileSize + 1];
+    fs = inFile.tellg();
+    fileBuffer = new char[(long long)(fs) + 1];
     inFile.seekg(0, ios::beg);
-    inFile.read(fileBuffer, fileSize);
+    inFile.read(fileBuffer, fs);
     inFile.close();
   }
 
@@ -254,8 +250,6 @@ string parseFileType(string inputFile) {
   for (unsigned int i = 0; i < inputFile.length(); i++) {
     file += tolower(inputFile[i]);
   }
-
-  cout << file << endl;
 
   if (file.find(".html") != string::npos) {
     return HTML;
