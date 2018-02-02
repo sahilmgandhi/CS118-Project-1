@@ -3,9 +3,6 @@
 // Project 1
 // This is the server code for the first project.
 
-// TODO 2: Test using files with case insensitive names
-// TODO 3: Think of other corner cases to test??
-
 #include <iostream>
 #include <unistd.h>
 #include <stdio.h>
