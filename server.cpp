@@ -265,8 +265,23 @@ string parseFileName(char *buffer) {
   }
   size_t found = request.find(" ");
   size_t found2 = request.find(" HTTP/1.1\r\n", found + 1, 10);
-  return found2 - found - 2 > 0 ? request.substr(found + 2, found2 - found - 2)
-                                : "";
+  string temp = found2 - found - 2 > 0
+                    ? request.substr(found + 2, found2 - found - 2)
+                    : "";
+  if (temp == "") {
+    return "";
+  } else { // convert the ending to lower case
+    size_t foundPeriod = temp.find(".");
+    if (foundPeriod == string::npos) {
+      return temp;
+    } else {
+      string temp2 = temp.substr(0, foundPeriod);
+      for (unsigned int i = foundPeriod; i < temp.length(); i++) {
+        temp2 += tolower(temp[i]);
+      }
+      return temp2;
+    }
+  }
 }
 
 string parseFileType(string inputFile) {
@@ -297,7 +312,7 @@ string parseFileType(string inputFile) {
     return PNG;
   } else if (file.find(".css") != string::npos) {
     return CSS;
-  } else if (file.find(".WMV") != string::npos) {
+  } else if (file.find(".wmv") != string::npos) {
     return WMV;
   } else if (file.find(".wav") != string::npos) {
     return WAV;
